@@ -11,7 +11,7 @@ func main() {
 	tGramBot := bot.NewTgramBot(api.GetAPIKey("token.txt"))
 	for {
 		for _, update := range tGramBot.GetUpdates() {
-			tGramBot.SendMsg(update.Message.Text)
+			tGramBot.SendMsg(update.Message.Text, update.Message.Chat.Id)
 			tGramBot.Offset = int(update.UpdateId) + 1
 		}
 

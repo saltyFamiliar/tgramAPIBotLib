@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"time"
 )
 
 type TgramBot struct {
@@ -36,8 +35,14 @@ func (bot *TgramBot) APIRequest(resource string) *api.Response {
 		log.Fatalln("Unable to get response")
 	}
 
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}(response.Body)
+
 	body, err := io.ReadAll(response.Body)
-	defer response.Body.Close()
 	if err != nil {
 		log.Fatalln("Unable to read response body")
 	}
@@ -64,17 +69,9 @@ func (bot *TgramBot) GetMe() *api.User {
 	return user
 }
 
-func (bot *TgramBot) SendMsg(msg string) {
-	chatID := "405907484"
-	req := fmt.Sprintf("sendMessage?chat_id=%s&text=%s", chatID, msg)
+func (bot *TgramBot) SendMsg(msg string, chatID int64) {
+	req := fmt.Sprintf("sendMessage?chat_id=%d&text=%s", chatID, msg)
 	bot.APIRequest(req)
-}
-
-func (bot *TgramBot) Spam() {
-	for {
-		time.Sleep(3 * time.Second)
-		bot.SendMsg("Hello world")
-	}
 }
 
 func (bot *TgramBot) GetUpdates() []api.Update {
