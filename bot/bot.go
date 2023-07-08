@@ -27,7 +27,7 @@ func (bot *TgramBot) APIRequest(resource string) *api.Response {
 	reqUrl := api.MakeEndpointStr(resource, bot.key)
 	req, err := http.NewRequest("GET", reqUrl, nil)
 	if err != nil {
-		log.Fatalln("Unable to create request")
+		panic(err)
 	}
 
 	response, err := bot.client.Do(req)
