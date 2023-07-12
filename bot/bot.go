@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/saltyFamiliar/tgramAPIBotLib/api"
@@ -22,9 +23,9 @@ func NewTgramBot(apiKey string) *TgramBot {
 	}
 }
 
-func (bot *TgramBot) APIRequest(resource string) (*api.Response, error) {
+func (bot *TgramBot) APIRequest(ctx context.Context, resource string) (*api.Response, error) {
 	reqUrl := api.MakeEndpointStr(resource, bot.key)
-	req, err := http.NewRequest("GET", reqUrl, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqUrl, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -49,8 +50,8 @@ func (bot *TgramBot) APIRequest(resource string) (*api.Response, error) {
 	return respBody, nil
 }
 
-func (bot *TgramBot) GetMe() (*api.User, error) {
-	resp, err := bot.APIRequest("getMe")
+func (bot *TgramBot) GetMe(ctx context.Context) (*api.User, error) {
+	resp, err := bot.APIRequest(ctx, "getMe")
 	if err != nil {
 		return nil, err
 	}
@@ -68,14 +69,14 @@ func (bot *TgramBot) GetMe() (*api.User, error) {
 	return user, nil
 }
 
-func (bot *TgramBot) SendMsg(msg string, chatID int64) error {
+func (bot *TgramBot) SendMsg(ctx context.Context, msg string, chatID int64) error {
 	req := fmt.Sprintf("sendMessage?chat_id=%d&text=%s", chatID, msg)
-	_, err := bot.APIRequest(req)
+	_, err := bot.APIRequest(ctx, req)
 	return err
 }
 
-func (bot *TgramBot) GetUpdates() ([]api.Update, error) {
-	resp, err := bot.APIRequest(fmt.Sprintf("getUpdates?offset=%d", bot.Offset))
+func (bot *TgramBot) GetUpdates(ctx context.Context) ([]api.Update, error) {
+	resp, err := bot.APIRequest(ctx, fmt.Sprintf("getUpdates?offset=%d", bot.Offset))
 	if err != nil {
 		return nil, err
 	}
