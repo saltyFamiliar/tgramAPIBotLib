@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/saltyFamiliar/tgramAPIBotLib/api"
-	"io"
 	"log"
 	"net/http"
 )
@@ -23,67 +22,73 @@ func NewTgramBot(apiKey string) *TgramBot {
 	}
 }
 
-func (bot *TgramBot) APIRequest(resource string) *api.Response {
+func (bot *TgramBot) APIRequest(resource string) (*api.Response, error) {
 	reqUrl := api.MakeEndpointStr(resource, bot.key)
 	req, err := http.NewRequest("GET", reqUrl, nil)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	response, err := bot.client.Do(req)
 	if err != nil {
-		log.Fatalln("Unable to get response")
+		return nil, err
 	}
 
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
+	defer func() {
+		err := response.Body.Close()
 		if err != nil {
-			log.Fatalln(err)
+			log.Printf("Error closing response body: %v,", err)
 		}
-	}(response.Body)
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		log.Fatalln("Unable to read response body")
-	}
+	}()
 
 	respBody := &api.Response{}
-	if err := json.Unmarshal(body, &respBody); err != nil {
-		log.Fatalln("Unable to marshal response body")
+	if err := json.NewDecoder(response.Body).Decode(respBody); err != nil {
+		return nil, err
 	}
 
-	return respBody
+	return respBody, nil
 }
 
-func (bot *TgramBot) GetMe() *api.User {
-	result, err := bot.APIRequest("getMe").Unwrap()
+func (bot *TgramBot) GetMe() (*api.User, error) {
+	resp, err := bot.APIRequest("getMe")
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
+	}
+
+	result, err := resp.Unwrap()
+	if err != nil {
+		return nil, err
 	}
 
 	user := &api.User{}
 	if err := json.Unmarshal(result, user); err != nil {
-		log.Fatalln("Unable to unmarshal response body")
+		return nil, fmt.Errorf("unable to unmarshal response body: %v", err)
 	}
 
-	return user
+	return user, nil
 }
 
-func (bot *TgramBot) SendMsg(msg string, chatID int64) {
+func (bot *TgramBot) SendMsg(msg string, chatID int64) error {
 	req := fmt.Sprintf("sendMessage?chat_id=%d&text=%s", chatID, msg)
-	bot.APIRequest(req)
+	_, err := bot.APIRequest(req)
+	return err
 }
 
-func (bot *TgramBot) GetUpdates() []api.Update {
-	result, err := bot.APIRequest(fmt.Sprintf("getUpdates?offset=%d", bot.Offset)).Unwrap()
+func (bot *TgramBot) GetUpdates() ([]api.Update, error) {
+	resp, err := bot.APIRequest(fmt.Sprintf("getUpdates?offset=%d", bot.Offset))
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
+	}
+
+	result, err := resp.Unwrap()
+	if err != nil {
+		return nil, err
 	}
 
 	var updates []api.Update
 	if err := json.Unmarshal(result, &updates); err != nil {
-		log.Fatalln("Unable to marshal result into []Update")
+		return nil, fmt.Errorf("unable to marshal result into []Update: %w", err)
 	}
 
-	return updates
+	return updates, nil
 }
