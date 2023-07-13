@@ -3,10 +3,9 @@ package main
 import (
 	"context"
 	"github.com/saltyFamiliar/tgramAPIBotLib/api"
+	"github.com/saltyFamiliar/tgramAPIBotLib/pkg/bot"
 	"log"
 	"time"
-
-	"github.com/saltyFamiliar/tgramAPIBotLib/bot"
 )
 
 func main() {
