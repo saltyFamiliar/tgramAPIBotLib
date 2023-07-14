@@ -9,17 +9,21 @@ import (
 	"net/http"
 )
 
+type RoutineRegistry map[string]*Routine
+
 type TgramBot struct {
-	Offset int
-	key    string
-	client *http.Client
+	Offset   int
+	key      string
+	Registry RoutineRegistry
+	client   *http.Client
 }
 
 func NewTgramBot(apiKey string) *TgramBot {
 	return &TgramBot{
-		Offset: 0,
-		key:    apiKey,
-		client: &http.Client{},
+		Offset:   0,
+		key:      apiKey,
+		Registry: RoutineRegistry{},
+		client:   &http.Client{},
 	}
 }
 
@@ -92,4 +96,12 @@ func (bot *TgramBot) GetUpdates(ctx context.Context) ([]api.Update, error) {
 	}
 
 	return updates, nil
+}
+
+func (bot *TgramBot) RegisterRoutine(hook string, routine *Routine) error {
+	if _, hookTaken := bot.Registry[hook]; !hookTaken {
+		bot.Registry[hook] = routine
+		return nil
+	}
+	return fmt.Errorf("couldn't register routine: name taken")
 }
