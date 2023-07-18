@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/saltyFamiliar/tgramAPIBotLib/api"
 	"github.com/saltyFamiliar/tgramAPIBotLib/pkg/bot"
+	"log"
 )
 
 func echo(msg string) (string, error) {
@@ -11,7 +12,12 @@ func echo(msg string) (string, error) {
 }
 
 func main() {
-	tGramBot := bot.NewTgramBot(api.GetAPIKey("token.txt"))
+	apiKey, err := api.GetAPIKey("token.txt")
+	if err != nil {
+		log.Fatalln("Api key file not found")
+	}
+	tGramBot := bot.NewTgramBot(apiKey)
+
 	echoRoutine := bot.NewRoutine(bot.Action{
 		Raw: echo,
 		Wrapper: func(i ...interface{}) (string, error) {

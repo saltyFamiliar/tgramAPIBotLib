@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 )
@@ -15,11 +14,11 @@ func MakeEndpointStr(resource, key string) string {
 	return fmt.Sprintf("%s/bot%s/%s", BaseURL, key, resource)
 }
 
-func GetAPIKey(path string) string {
+func GetAPIKey(path string) (string, error) {
 	key, err := os.ReadFile(path)
 	if err != nil {
-		log.Fatalln(err)
+		return "", err
 	}
 
-	return strings.TrimSpace(string(key))
+	return strings.TrimSpace(string(key)), nil
 }
