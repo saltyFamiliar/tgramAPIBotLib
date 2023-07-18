@@ -7,6 +7,8 @@ import (
 	"github.com/saltyFamiliar/tgramAPIBotLib/api"
 	"log"
 	"net/http"
+	"strings"
+	"time"
 )
 
 type RoutineRegistry map[string]*Routine
@@ -104,4 +106,54 @@ func (bot *TgramBot) RegisterRoutine(hook string, routine *Routine) error {
 		return nil
 	}
 	return fmt.Errorf("couldn't register routine: name taken")
+}
+
+func (bot *TgramBot) ParseMessage(msg string) (*Routine, []string, error) {
+	words := strings.Split(msg, " ")
+	routine, ok := bot.Registry[words[0]]
+	if !ok {
+		return nil, nil, fmt.Errorf("routine not found")
+	}
+
+	var args []string
+	if len(words) > 1 {
+		args = words[1:]
+	}
+
+	return routine, args, nil
+}
+
+func (bot *TgramBot) Run() {
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		updates, err := bot.GetUpdates(ctx)
+		cancel()
+		if err != nil {
+			log.Printf("Error getting updates: %v", err)
+		}
+
+		for _, update := range updates {
+			bot.Offset = int(update.UpdateId) + 1
+
+			routine, args, err := bot.ParseMessage(update.Message.Text)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			respMsg, err := routine.Execute([]string{strings.Join(args, " ")})
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			if err = bot.SendMsg(ctx, respMsg, update.Message.Chat.Id); err != nil {
+				log.Printf("unable to send message: %v ", err)
+			}
+			cancel()
+		}
+
+		time.Sleep(2 * time.Second)
+	}
 }
