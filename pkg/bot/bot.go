@@ -124,36 +124,70 @@ func (bot *TgramBot) ParseMessage(msg string) (*Routine, []string, error) {
 }
 
 func (bot *TgramBot) Run() {
-	for {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		updates, err := bot.GetUpdates(ctx)
-		cancel()
-		if err != nil {
-			log.Printf("Error getting updates: %v", err)
-		}
+	updatesCh := make(chan []api.Update, 10)
+	jobCh := make(chan *api.Message, 10)
 
-		for _, update := range updates {
-			bot.Offset = int(update.UpdateId) + 1
-
-			routine, args, err := bot.ParseMessage(update.Message.Text)
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
-
-			respMsg, err := routine.Execute([]string{strings.Join(args, " ")})
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
-
+	// update producer
+	go func() {
+		for {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			if err = bot.SendMsg(ctx, respMsg, update.Message.Chat.Id); err != nil {
-				log.Printf("unable to send message: %v ", err)
+			updates, err := bot.GetUpdates(ctx)
+			if err != nil {
+				log.Printf("Error getting updates: %v", err)
 			}
 			cancel()
+			updatesCh <- updates
+			time.Sleep(4 * time.Second)
 		}
+	}()
 
-		time.Sleep(2 * time.Second)
+	// consumes updates, produces jobs
+	go func() {
+		for updates := range updatesCh {
+			for _, update := range updates {
+				bot.Offset = int(update.UpdateId) + 1
+				if update.Message == nil {
+					continue
+				}
+
+				jobCh <- update.Message
+				go func(msg *api.Message) {
+					ackMsg := fmt.Sprintf("Received request: %s", msg.Text)
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+					if err := bot.SendMsg(ctx, ackMsg, msg.Chat.Id); err != nil {
+						fmt.Println(err)
+					}
+					cancel()
+				}(update.Message)
+			}
+		}
+	}()
+
+	// consumes jobs, sends output to user
+	for job := range jobCh {
+		go func(reqMsg *api.Message) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+			defer cancel()
+
+			routine, args, err := bot.ParseMessage(reqMsg.Text)
+			if err != nil {
+				if msgErr := bot.SendMsg(ctx, err.Error(), reqMsg.Chat.Id); msgErr != nil {
+					fmt.Println(msgErr)
+				}
+				return
+			}
+
+			respMsg, err := routine.Execute(args)
+			if err != nil {
+				if msgErr := bot.SendMsg(ctx, err.Error(), reqMsg.Chat.Id); msgErr != nil {
+					fmt.Println(msgErr)
+				}
+				return
+			}
+
+			if err = bot.SendMsg(ctx, respMsg, reqMsg.Chat.Id); err != nil {
+				fmt.Printf("unable to send message: %v ", err)
+			}
+		}(job)
 	}
 }
