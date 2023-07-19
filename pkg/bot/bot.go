@@ -81,6 +81,14 @@ func (bot *TgramBot) SendMsg(ctx context.Context, msg string, chatID int64) erro
 	return err
 }
 
+func (bot *TgramBot) SendMsgWithTimeout(msg string, chatID int64, timeout time.Duration) error {
+	req := fmt.Sprintf("sendMessage?chat_id=%d&text=%s", chatID, msg)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err := bot.APIRequest(ctx, req)
+	return err
+}
+
 func (bot *TgramBot) GetUpdates(ctx context.Context) ([]api.Update, error) {
 	resp, err := bot.APIRequest(ctx, fmt.Sprintf("getUpdates?offset=%d", bot.Offset))
 	if err != nil {
@@ -153,11 +161,9 @@ func (bot *TgramBot) Run() {
 				jobCh <- update.Message
 				go func(msg *api.Message) {
 					ackMsg := fmt.Sprintf("Received request: %s", msg.Text)
-					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-					if err := bot.SendMsg(ctx, ackMsg, msg.Chat.Id); err != nil {
+					if err := bot.SendMsgWithTimeout(ackMsg, msg.Chat.Id, 5*time.Second); err != nil {
 						fmt.Println(err)
 					}
-					cancel()
 				}(update.Message)
 			}
 		}
@@ -166,12 +172,9 @@ func (bot *TgramBot) Run() {
 	// consumes jobs, sends output to user
 	for job := range jobCh {
 		go func(reqMsg *api.Message) {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-			defer cancel()
-
 			routine, args, err := bot.ParseMessage(reqMsg.Text)
 			if err != nil {
-				if msgErr := bot.SendMsg(ctx, err.Error(), reqMsg.Chat.Id); msgErr != nil {
+				if msgErr := bot.SendMsgWithTimeout(err.Error(), reqMsg.Chat.Id, 5*time.Second); msgErr != nil {
 					fmt.Println(msgErr)
 				}
 				return
@@ -179,13 +182,13 @@ func (bot *TgramBot) Run() {
 
 			respMsg, err := routine.Execute(args)
 			if err != nil {
-				if msgErr := bot.SendMsg(ctx, err.Error(), reqMsg.Chat.Id); msgErr != nil {
+				if msgErr := bot.SendMsgWithTimeout(err.Error(), reqMsg.Chat.Id, 5*time.Second); msgErr != nil {
 					fmt.Println(msgErr)
 				}
 				return
 			}
 
-			if err = bot.SendMsg(ctx, respMsg, reqMsg.Chat.Id); err != nil {
+			if err = bot.SendMsgWithTimeout(respMsg, reqMsg.Chat.Id, 5*time.Second); err != nil {
 				fmt.Printf("unable to send message: %v ", err)
 			}
 		}(job)

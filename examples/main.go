@@ -14,7 +14,7 @@ func echo(msg string) (string, error) {
 func main() {
 	apiKey, err := api.GetAPIKey("token.txt")
 	if err != nil {
-		log.Fatalln("Api key file not found")
+		log.Fatalln(err)
 	}
 	tGramBot := bot.NewTgramBot(apiKey)
 
@@ -26,7 +26,7 @@ func main() {
 	})
 
 	if err := tGramBot.RegisterRoutine("echo", echoRoutine); err != nil {
-		fmt.Println("hook previously registered")
+		fmt.Println(err)
 	}
 
 	tGramBot.Run()
